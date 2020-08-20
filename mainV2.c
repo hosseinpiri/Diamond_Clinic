@@ -23,6 +23,7 @@ int main()
 	int i, j, keepgoing, repnum, elevator_avail, floor_this_person_is_going_to, elevator_index;
 	double minutes_before_appt_time, unif;
 	event next_event; 
+	person next_in_Line;
 
 	// This seeds the Mersenne Twister Random Number Generator
 	unsigned long long init[4] = { 0x12345ULL, 0x23456ULL, 0x34567ULL, 0x45678ULL }, length = 4;
@@ -34,10 +35,11 @@ int main()
   	{
     Initialize_Rep();
 	Load_Lobby_Arrivals();  //this includes patients, staff, and doctors
+   // test for send elevator and elevator_avail
+	keepgoing=1;
 
-	keepgoing = 1;
-#if 0
-		while (keepgoing)
+		//while (keepgoing)
+		for (i=0;i<1500;i++)
 		{
 			//get next event off the top of the linked list
 			next_event = event_head->Event;
@@ -45,42 +47,120 @@ int main()
 
 			if (num_events_on_calendar == 0) //this indicates this simulation replication is over
 				keepgoing = 0;
-			else if (next_event.event_type == CLINIC_DEPARTURE)
+
+			//SMS: CONTINUE HERE	
+			if (next_event.event_type == CLINIC_DEPARTURE)
 			{
-				//sms: to be filled in later
-			}
-			else if (next_event.event_type == PERSON_ARRIVES_LOBBY)
-			{
-				//if there is an elevator waiting open, then get in it; othwerise, have to wait
-				elevator_avail = Elevator_Available(elevators, LOBBY); //returns elevator index + 1 if elevator is avail
+				elevator_avail = Elevator_Available(elevators, people[next_event.entity_type][next_event.entity_index].clinic); // need to set which clinic is?
 				if (elevator_avail)  //this means someone arrives to an idle elevator at their floor.
 				{
 					elevator_index = elevator_avail - 1;
+					elevators[elevator_index].idle = 0;
+					elevators[elevator_index].num_people++;
+					elevators[elevator_index].direction = DOWN; //assume now that we are just going down to lobby
+					floor_this_person_is_going_to = 0;
+					elevators[elevator_index].floor_to[floor_this_person_is_going_to] = 1;
+					elevators[elevator_index].next_floor = floor_this_person_is_going_to;
+
+					Send_Elevator(elevator_index,next_event); 
+					
+					elevators[elevator_index].idle = 1; //back to idle condition
+					
+				}
+			}
+
+			#if 0
+			if (next_event.event_type == WAITING)
+			{ elevator_avail = Elevator_Available(elevators, LOBBY);
+				if (elevator_avail)
+				{next_event.event_type = PERSON_READY_LOBBY;
+				}
+				else
+				{
+				wait_time = elevators[0].elevator_tot_time;
+				for (int p=1;p<NUM_ELEVATORS;p++)
+				{wait_time = min(wait_time,elevators[p].elevator_tot_time);
+				}
+				Load_Event(&event_head, wait_time + EPSILON , WAITING , next_event.entity_type, next_event.entity_index);
+				}
+			}
+			if (next_event.event_type == PERSON_READY_LOBBY)
+			{ 	elevator_avail = Elevator_Available(elevators, LOBBY); //returns elevator index + 1 if elevator is avail
+				if (elevator_avail)  //this means someone arrives to an idle elevator at their floor.
+					elevator_index= elevator_avail - 1;
 					elevators[elevator_index].idle = 0;
 					elevators[elevator_index].num_people++;
 					elevators[elevator_index].direction = UP;
 					floor_this_person_is_going_to = people[next_event.entity_type][next_event.entity_index].to_floor;
 					elevators[elevator_index].floor_to[floor_this_person_is_going_to] = 1;
 					elevators[elevator_index].next_floor = floor_this_person_is_going_to;
+					people[next_event.entity_type][next_event.entity_index].elevator_ind = elevator_index; 
+					//SMS: CONTINUE HERE
+					Send_Elevator(elevator_index,next_event); }
+			#endif
 
-					Send_Elevator(elevator_index);  //SMS: CONTINUE HERE
+			if (next_event.event_type == PERSON_ARRIVES_LOBBY)
+			{
+				//if there is an elevator waiting open, then get in it; othwerise, have to wait
+				elevator_avail = Elevator_Available(elevators, LOBBY); //returns elevator index + 1 if elevator is avail
+				if (elevator_avail)  //this means someone arrives to an idle elevator at their floor.
+
+					{elevator_index= elevator_avail - 1;
+					elevators[elevator_index].idle = 0;
+					elevators[elevator_index].num_people++;
+					elevators[elevator_index].direction = UP;
+					floor_this_person_is_going_to = people[next_event.entity_type][next_event.entity_index].to_floor;
+					elevators[elevator_index].floor_to[floor_this_person_is_going_to] = 1;
+					elevators[elevator_index].next_floor = floor_this_person_is_going_to;
+					people[next_event.entity_type][next_event.entity_index].elevator_ind = elevator_index; 
+					elevators[elevator_index].current_floor=0;
+					//SMS: CONTINUE HERE
+					Send_Elevator(elevator_index,next_event); 
+					//elevators[elevator_index].idle = 1; //back to idle condition
+					//elevators[elevator_index].current_floor=0; // back to lobby
+					// change type of ARRIVE TO LOBBY to ELEVATOR_ARRIVAL
+					
 				}
+				
 				else
 				{
-					people_waiting_elevator[UP][LOBBY]++;
+					//next_event.event_type = WAITING;
+					//wait_time = elevators[0].elevator_tot_time;
+					//for (int k=1;k<NUM_ELEVATORS;k++)
+					//{wait_time = min(wait_time,elevators[k].elevator_tot_time);
+					//}
+					Load_Event_Person(&hall_head[UP][LOBBY],EPSILON , next_event.entity_type, next_event.entity_index); // add a person without elevator to waiting linked list
+
+					//people_waiting_elevator[UP][LOBBY]++;
 					//add this person's node to hall_head linked list. 
 					//SMS: CONTINUE HERE
+					
 				}
+				
 			}
 
-			else if (next_event.event_type == ELEVATOR_ARRIVAL)  //elevator opens doors at a floor
+			if (next_event.event_type == ELEVATOR_ARRIVAL)  //elevator opens doors at a floor
 			{
-				num_off = 0;
-				num_on = 0;
+			
+			elevator_index = people[next_event.entity_type][next_event.entity_index].elevator_ind;
+			elevators[elevator_index].current_floor = elevators[elevator_index].next_floor;
+			elevators[elevator_index].idle = 0;
+			elevators[elevator_index].num_people--;
+			elevators[elevator_index].direction = DOWN;
+			floor_this_person_is_going_to = 0; // for now just move to lobby
+			elevators[elevator_index].floor_to[floor_this_person_is_going_to] = 1;
+			elevators[elevator_index].next_floor = floor_this_person_is_going_to;
+			Send_Elevator(elevator_index,next_event);
+			// elevators[elevator_index].current_floor = elevators[elevator_index].next_floor ;
+
+			}
+			#if 0
+				int num_off = 0;
+				int num_on = 0;
 				//see if/which people get off
-				elev_num = next_event.elevator_num;
+				int elev_num = next_event.elevator_num;
 				elevators[elev_num].current_floor = elevators[elev_num].next_floor; //update current floor
-				arrival_floor = elevators[elev_num].current_floor;
+				int arrival_floor = elevators[elev_num].current_floor;
 				//see if anyone on the elevator is getting off on this floor.  
 				for (i = 0; i < elevators[elev_num].num_people; i++)
 				{
@@ -121,8 +201,16 @@ int main()
 				//see if/which people get on
 				if (elevators[elev_num].num_people == 0)
 				{
-					elevators[elev_num].direction = NO_DIRECTION;
+					elevators[elev_num].direction = DOWN;
+					elevators[elev_num].idle=0;
+					floor_this_person_is_going_to = 0; // assume we are just going to lobby 
+					elevators[elevator_index].floor_to[floor_this_person_is_going_to] = 1;
+					elevators[elevator_index].next_floor = floor_this_person_is_going_to;
+					Send_Elevator(elev_num,next_event);
 
+
+#endif
+					#if 0
 					switch (hall_head)
 						​{
 							case ((hall_head[UP][arrival_floor] == NULL) && (hall_head[DOWN][arrival_floor] == NULL)): //means no one waiting to get on at this floor; see if other floors need elevator
@@ -150,8 +238,8 @@ int main()
 									// default statements
 
 					}
-
-					elevators[elev_num].direction = direction;
+					
+					elevators[elev_num].direction = DOWN;
 
 
 
@@ -180,6 +268,7 @@ int main()
 					//else
 					{
 					}
+				
 				}
 			}//end if next event is ELEVATOR_ARRIVAL
 
@@ -188,16 +277,17 @@ int main()
 				printf("Shouldn't get to the else condition for checking event types");
 				exit(0);
 			}
-
+	#endif
 		} //end while keepgoing
-		 
-#endif
+		 // records all stats for each replication 
+
 		//record KPIs from this replication
 
 	}  //end for each rep
-	
+	//print stats results
+	Print_Calendar();
 	fclose(output_file);
-}
+}	
 
 /********************************************************************************************
 Open_and_Read_Files() opens all output and input files, and reads the latter into appropriate data structures 
@@ -335,8 +425,9 @@ void Initialize_Rep()
 	{
 		for (j = 0; j < NUM_FLOORS; j++)
 		{
-			//num_wait_floor[i][j] = 0;    What do you mean by this value? 
+			//num_wait_floor[i][j] = 0;   
 			hall_head[i][j] = NULL; //list of people waiting for elevators for any direction in any floor is empty now
+			num_events_on_headhall = 0 ; // total number of people in line is zero
 		}
 	}
 } //end Initialize()
@@ -390,7 +481,8 @@ void Load_Lobby_Arrivals()
 				people[PATIENT][total_pats].index = total_pats;
 				people[PATIENT][total_pats].clinic = i;   // indexing patients
 				people[PATIENT][total_pats].to_floor = clinic_floor;   //when entering lobby, the to floor is the clinic they are going to
-				people[PATIENT][total_pats].start_time = clinics[i].doc_start_times[j] + k * appointment_duration; // assume uniform duration time for each patient
+				people[PATIENT][total_pats].start_time = clinics[i].doc_start_times[j] + k * appointment_duration;
+				people[PATIENT][total_pats].appointment = appointment_duration; // assume uniform duration time for each patient
 				unif = Unif(); // uniform number generates to see if patient will show up or not ! 
 				if (unif < NO_SHOW_PROB) // threshold 
 					people[PATIENT][total_pats].no_show = 1;
@@ -410,7 +502,7 @@ void Load_Lobby_Arrivals()
 	}//end for i looping through each clinic``
 
 	//sms test
-	Print_Calendar();
+	;
 	dummy = 0;
 }
 
@@ -418,12 +510,61 @@ void Load_Lobby_Arrivals()
 Send_Elevator() inserts onto the event calendar the time that the elevator will arrive time to the next floor it is headed to, either
 because that's the next floor someone on the inside has pressed, or because it is first picking someone up
 based on a hall call.
+AP : Check with Steven to make sure this is the same function he wanted to write
 ********************************************************************************************/
-void Send_Elevator(int elevator)
+
+void Send_Elevator(int index , event next_event) // input elevator_index and next_event that needs elevator
 {
+	//SMS: CONTINUE HERE
+	double travel_time;  // what is elevator_travel_time[NUM_DIRECTIONS]? why should we record direction?
+					
+	travel_time = elevator_travel_time_per_floor * (elevators[index].next_floor-elevators[index].current_floor);
+	// time it takes for elevator to move from current location to next floor
+	 // check this please make sure its right
 
-	//sms: CONTINUE HERE
-
+	// add total wait time and travel time
+	
+	if (next_event.event_type == PERSON_ARRIVES_LOBBY)
+	{elevators[index].elevator_time[0] += travel_time ; // add time to up direction for this elevator
+	people[next_event.entity_type][next_event.entity_index].elevator_travel_time = people[next_event.entity_type][next_event.entity_index].arrive_to_elevator_time + travel_time; 
+	Load_Event(&event_head, people[next_event.entity_type][next_event.entity_index].arrive_to_elevator_time + travel_time, ELEVATOR_ARRIVAL , next_event.entity_type, next_event.entity_index);  // add ELVEVATOR_ARRIVAL event into the list
+	}
+	if (next_event.event_type == ELEVATOR_ARRIVAL)
+	{elevators[index].elevator_time[1] += (-1*travel_time) ; // add time to down direction for this elevator travel time is negative ! (-1)
+	elevators[index].idle = 1;
+	elevators[index].elevator_tot_time = elevators[index].elevator_time[0] + elevators[index].elevator_time[1];
+	// we are going to check if we have a person waiting in a queue as we have a elevator in lobby in idle condition
+	if (num_events_on_headhall!=0)
+		{next_in_Line = hall_head[UP][LOBBY]->Person;
+		Remove_Event_Person(&hall_head[UP][LOBBY]);
+		// start from here !!
+		int floor_this_person_is_going_to;
+		elevators[index].num_people++;
+		elevators[index].direction = UP;
+		next_event.entity_index = next_in_Line.index;
+		next_event.entity_type = next_in_Line.person_type;
+		floor_this_person_is_going_to = people[next_event.entity_type][next_event.entity_index].to_floor;
+		elevators[index].floor_to[floor_this_person_is_going_to] = 1;
+		elevators[index].next_floor = floor_this_person_is_going_to;
+		elevators[index].current_floor = 0;
+		people[next_event.entity_type][next_event.entity_index].elevator_ind = index; 
+		travel_time = elevator_travel_time_per_floor * (elevators[index].next_floor-elevators[index].current_floor);
+		elevators[index].elevator_time[0] += travel_time ;
+		people[next_event.entity_type][next_event.entity_index].elevator_travel_time = people[next_event.entity_type][next_event.entity_index].arrive_to_elevator_time + travel_time;
+		people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic = people[next_event.entity_type][next_event.entity_index].elevator_travel_time + elevators[index].elevator_tot_time  ; 
+		people[next_event.entity_type][next_event.entity_index].elevator_wait_time= elevators[index].elevator_tot_time ;
+		Load_Event(&event_head,people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic, ELEVATOR_ARRIVAL , next_event.entity_type, next_event.entity_index);
+		Load_Event(&event_head,people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic+people[next_event.entity_type][next_event.entity_index].appointment, CLINIC_DEPARTURE , next_event.entity_type, next_event.entity_index);
+		}
+	}
+	//if (next_event.event_type == PERSON_READY_LOBBY)
+	//{elevators[index].elevator_time[0] += travel_time ;
+	//people[next_event.entity_type][next_event.entity_index].elevator_travel_time = people[next_event.entity_type][next_event.entity_index].arrive_to_elevator_time + travel_time;
+	//people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic = people[next_event.entity_type][next_event.entity_index].elevator_travel_time + next_event.time ; 
+	//Load_Event(&event_head,people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic, ELEVATOR_ARRIVAL , next_event.entity_type, next_event.entity_index);
+	//Load_Event(&event_head,people[next_event.entity_type][next_event.entity_index].total_time_to_get_clinic+people[next_event.entity_type][next_event.entity_index].appointment, CLINIC_DEPARTURE , next_event.entity_type, next_event.entity_index);
+	//}
+		//Load_Event(&event_head, people[next_event.entity_type][next_event.entity_index].arrive_to_elevator_time + travel_time, ELEVATOR_ARRIVAL , next_event.entity_type, next_event.entity_index);  // add ELVEVATOR_ARRIVAL event into the list
 }
 
 /********************************************************************************************
@@ -448,7 +589,7 @@ void Load_Event(struct event_node** head_ref, double time, int event_type, int e
 	}
 	else
 	{
-		/* Locate the node before the point of insertion */
+		/* Locate the node before the point of insertion */   
 		current = *head_ref;
 		while (current->next != NULL && current->next->Event.time < event_ptr->Event.time)
 			current = current->next;
@@ -458,6 +599,9 @@ void Load_Event(struct event_node** head_ref, double time, int event_type, int e
 	}
 	num_events_on_calendar++;
 }
+
+
+
 
 /********************************************************************************************
 Print_Calendar() prints all events currently in the event calendar to an external file
@@ -480,8 +624,6 @@ void Print_Calendar()
 	}
 	dummy = 0;
 }
-
-
 
 /********************************************************************************************
 Remove_Event() removes the head of the event calendar; i.e., deletes the event that was scheduled to occur next.
@@ -576,3 +718,57 @@ void Process_Lobby_Arrival(event lobby_arrival)
 }
 
 #endif
+
+
+
+/********************************************************************************************
+Load_Event() inserts a new event into the event calendar (a linked list), maintaining the chronological order
+********************************************************************************************/
+void Load_Event_Person(struct person_node** head_ref, double time,int person_type, int index)
+{
+	struct person_node* current;
+	struct person_node* person_ptr;
+
+	person_ptr = (struct person_node*)malloc(sizeof(struct person_node));
+	person_ptr->Person.time = time;
+	person_ptr->Person.person_type = person_type;
+	person_ptr->Person.index = index;
+
+	/* Special case for inserting at the head  */
+	if (*head_ref == NULL || (*head_ref)->Person.time >= person_ptr->Person.time)
+	{
+		person_ptr->next = *head_ref;
+		*head_ref = person_ptr;
+	}
+	else
+	{
+		/* Locate the node before the point of insertion */   
+		current = *head_ref;
+		while (current->next != NULL && current->next->Person.time < person_ptr->Person.time)
+			current = current->next;
+
+		person_ptr->next = current->next;
+		current->next = person_ptr;
+	}
+	num_events_on_headhall ++;
+}
+
+/********************************************************************************************
+Remove_Event() removes the head of the event calendar; i.e., deletes the event that was scheduled to occur next.
+This is called after the code above already obtained that next event to process in the simulation. 
+********************************************************************************************/
+void Remove_Event_Person(struct person_node** head_ref)
+{
+	struct person_node* temp;
+
+	if (*head_ref == NULL)
+	{
+		printf("head_ref should never be NULL when calling Remove_Event\n");
+		exit(0);
+	}
+
+	temp = *head_ref;
+	*head_ref = temp->next;
+	free(temp);
+	num_events_on_headhall--;
+}
