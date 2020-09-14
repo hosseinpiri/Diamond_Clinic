@@ -137,7 +137,7 @@ double elevator_travel_time_per_floor = FLOOR_DISTANCE / ELEVATOR_VELOCITY; //mi
 struct person_node* person_ptr; 
 struct event_node* event_head; //starts the linked list for event calendar
 struct person_node* elevator_head[NUM_ELEVATORS]; //a linked list of people for each elevator
-struct person_node* hall_head[NUM_DIRECTIONS][NUM_FLOORS]; //a linked list of people waiting for elevators in each direction
+struct person_node* hall_head[NUM_DIRECTIONS][NUM_FLOORS+1]; //1(lobby)+NUM_FLOORS a linked list of people waiting for elevators in each direction
 
 clinic clinics[NUM_CLINICS];
 person people[NUM_PEOPLE_TYPES][MAX_PEOPLE]; 
@@ -147,6 +147,8 @@ elevator elevators[NUM_ELEVATORS];
 void Open_and_Read_Files();
 void Load_Event(struct event_node**, double, int, int, int);
 void Load_Event_Person(struct person_node**, double,int, int);
+void Load_Event_Elevator(struct person_node**, double ,int , int , int );
+void Remove_Event_Elevator(struct person_node**);
 void Remove_Event(struct event_node**);
 void Remove_Event_Person(struct person_node**);
 void Load_Lobby_Arrivals();
@@ -163,5 +165,7 @@ int Elevator_Available(elevator elevs[], int floor);
 
 double wait_time;
 int num_events_on_headhall ;
+int num_events_on_elevator;
 
 person next_in_Line;
+int people_queue_lobby; 
