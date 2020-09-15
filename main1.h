@@ -169,3 +169,4 @@ int num_events_on_elevator;
 
 person next_in_Line;
 int people_queue_lobby; 
+int k ; 
